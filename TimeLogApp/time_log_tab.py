@@ -7,6 +7,7 @@ import datetime
 from pathlib import Path
 from typing import Optional
 import csv
+from tkcalendar import DateEntry
 
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -534,12 +535,29 @@ class TimeLogTab(ttk.Frame):
         period_row = tk.Frame(inner, bg=self.C["card"])
         period_row.pack(fill=tk.X, pady=(0, 16))
 
-        self._label(period_row, "Period:", bold=True, size=9, color=self.C["muted"]).pack(side=tk.LEFT, padx=(0, 8))
-        self.period_var = tk.StringVar()
-        self.period_combo = ttk.Combobox(period_row, textvariable=self.period_var,
-                                         state="readonly", width=32, style="Modern.TCombobox")
-        self.period_combo.pack(side=tk.LEFT, padx=(0, 12))
-        self.period_combo.bind("<<ComboboxSelected>>", self._on_period_change)
+        # Helper to style DateEntry
+        style = ttk.Style()
+        style.configure("DateEntry", fieldbackground=self.C["card"], background=self.C["card"], foreground=self.C["text"], borderwidth=0)
+
+        self._label(period_row, "From:", bold=True, size=9, color=self.C["muted"]).pack(side=tk.LEFT, padx=(0, 8))
+        self.start_date_entry = DateEntry(period_row, width=12, background=self.C["primary"], foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        self.start_date_entry.pack(side=tk.LEFT, padx=(0, 12))
+
+        self._label(period_row, "To:", bold=True, size=9, color=self.C["muted"]).pack(side=tk.LEFT, padx=(0, 8))
+        self.end_date_entry = DateEntry(period_row, width=12, background=self.C["primary"], foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        self.end_date_entry.pack(side=tk.LEFT, padx=(0, 12))
+
+        self.btn_apply = self._btn(period_row, "Apply", self._on_apply_date_range,
+                                   self.C["primary"], hover_bg=self.C["primary600"], size=10)
+        self.btn_apply.pack(side=tk.LEFT, padx=(0, 12))
+
+        # Quick-select Buttons
+        preset_frame = tk.Frame(inner, bg=self.C["card"])
+        preset_frame.pack(fill=tk.X, pady=(0, 16))
+        self._btn(preset_frame, "This Period", lambda: self._on_preset("this_period"), self.C["border"], size=9, bold=False).pack(side=tk.LEFT, padx=(0, 8))
+        self._btn(preset_frame, "Last Period", lambda: self._on_preset("last_period"), self.C["border"], size=9, bold=False).pack(side=tk.LEFT, padx=(0, 8))
+        self._btn(preset_frame, "This Month", lambda: self._on_preset("this_month"), self.C["border"], size=9, bold=False).pack(side=tk.LEFT, padx=(0, 8))
+
 
         # Stats strip (4 cards)
         stats = tk.Frame(inner, bg=self.C["card"])
@@ -757,39 +775,35 @@ class TimeLogTab(ttk.Frame):
         if not self.document:
             return
 
-        entries = self._valid_entries()
+        # Set default period
         today = datetime.date.today()
-        today_period = get_period(today)
-        periods = set()
+        start, end = get_period(today)
+        self.start_date_entry.set_date(start)
+        self.end_date_entry.set_date(end)
+        self._apply_range(start, end)
 
-        for s, e in get_periods_for_entries(entries):
-            periods.add((s, e))
+    def _on_apply_date_range(self):
+        start = self.start_date_entry.get_date()
+        end = self.end_date_entry.get_date()
+        self._apply_range(start, end)
 
-        for i in range(3):
-            d = today + datetime.timedelta(days=30 * i)
-            periods.add(get_period(d))
-
-        self._period_options = sorted(periods, key=lambda p: p[0], reverse=True)
-        self.period_combo["values"] = [f"{s.strftime('%b %d')} – {e.strftime('%b %d, %Y')}"
-                                       for s, e in self._period_options]
-
-        if self._period_options:
-            try:
-                idx = next(i for i, (s, e) in enumerate(self._period_options)
-                           if s == today_period[0] and e == today_period[1])
-            except StopIteration:
-                idx = 0
-            self.period_combo.current(idx)
-            self._on_period_change(None)
-
-    def _on_period_change(self, _event):
-        idx = self.period_combo.current()
-        if not (0 <= idx < len(self._period_options)):
+    def _on_preset(self, preset):
+        today = datetime.date.today()
+        if preset == "this_period":
+            start, end = get_period(today)
+        elif preset == "last_period":
+            # Rough approximation
+            start, end = get_period(today - datetime.timedelta(days=15))
+        elif preset == "this_month":
+            start = today.replace(day=1)
+            end = today
+        else:
             return
-        self._apply_period(self._period_options[idx])
+        self.start_date_entry.set_date(start)
+        self.end_date_entry.set_date(end)
+        self._apply_range(start, end)
 
-    def _apply_period(self, period):
-        start, end = period
+    def _apply_range(self, start, end):
         s, e = start.isoformat(), end.isoformat()
         self._period_label.config(text=f"{start.strftime('%b %d')} – {end.strftime('%b %d')}")
 
@@ -1056,12 +1070,9 @@ class TimeLogTab(ttk.Frame):
     def _on_export_csv(self):
         if not self.document:
             return
-        idx = self.period_combo.current()
-        if not (0 <= idx < len(self._period_options)):
-            messagebox.showerror("Export", "Select a period first.")
-            return
 
-        start, end = self._period_options[idx]
+        start = self.start_date_entry.get_date()
+        end = self.end_date_entry.get_date()
         s, e = start.isoformat(), end.isoformat()
         fn = f"time_log_{s}_to_{e}.csv"
         fp = _get_csv_export_dir() / fn
