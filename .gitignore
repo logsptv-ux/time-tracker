@@ -1,0 +1,11 @@
+# Ignore build artifacts, caches, and user data
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+dist/
+TimeLogApp_Portable.zip
+dist_portable/
+data/time_log.json
+.git/
