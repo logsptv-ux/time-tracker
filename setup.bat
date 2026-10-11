@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 REM ==============================================================================
 REM TimeLogApp v2.1 - Setup/Installer
 REM ==============================================================================
@@ -84,14 +84,14 @@ REM Step 4: Install dependencies
 REM ============================================================================
 echo [Step 4/5] Installing required packages...
 
-echo   - Installing matplotlib...
-python -m pip install matplotlib --quiet 2>nul
+python -m pip install -r requirements.txt --quiet
 if errorlevel 1 (
-    echo   [WARNING] Failed to install matplotlib
-    echo   The app will have limited chart functionality
+    echo   [WARNING] Failed to install dependencies
+    echo   The app may have limited functionality
 ) else (
-    echo   [OK] matplotlib installed
-)
+    ) else (
+        echo   [OK] Dependencies installed
+    )
 
 REM ============================================================================
 REM Step 5: Create shortcuts and launchers
