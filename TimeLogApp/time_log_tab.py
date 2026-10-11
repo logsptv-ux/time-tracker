@@ -248,10 +248,10 @@ class TimeLogTab(ttk.Frame):
         tasks = [t for t, h in breakdown]
         hours = [h for t, h in breakdown]
 
-        fig = Figure(figsize=(4, 3), dpi=100, facecolor=self.C["card"])
+        fig = Figure(figsize=(5, 4), dpi=100, facecolor=self.C["card"])
         ax = fig.add_subplot(111)
         ax.pie(hours, labels=tasks, autopct='%1.1f%%', textprops={'color': self.C["text"]})
-        fig.tight_layout()
+        fig.tight_layout(pad=1.0)
 
         canvas = FigureCanvasTkAgg(fig, master=self._chart_container)
         canvas.draw()

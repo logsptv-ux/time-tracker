@@ -77,6 +77,21 @@ if errorlevel 1 (
     echo [OK] matplotlib already installed
 )
 
+REM Check if tkcalendar is installed, install if missing
+python -c "import tkcalendar" >nul 2>&1
+if errorlevel 1 (
+    echo [!] tkcalendar not found, installing...
+    python -m pip install tkcalendar --quiet
+    if errorlevel 1 (
+        echo [!] Warning: Could not install tkcalendar automatically
+        echo     The app will have limited date-range functionality
+    ) else (
+        echo [OK] tkcalendar installed successfully
+    )
+) else (
+    echo [OK] tkcalendar already installed
+)
+
 REM All checks passed, launch the app
 echo.
 echo ============================================================================
