@@ -5,16 +5,11 @@ import os
 import uuid
 import tempfile
 from pathlib import Path
-
-
-def _get_app_dir() -> Path:
-    """Return the application root directory (the directory containing main.py)."""
-    # This file is at TimeLogApp/store.py, so go up one level to get app root.
-    return Path(__file__).resolve().parent.parent
+from .portable import DATA_DIR
 
 
 def _get_default_path() -> Path:
-    return _get_app_dir() / "data" / "time_log.json"
+    return DATA_DIR / "time_log.json"
 
 
 _ENTRY_FIELDS = {"id", "date", "task", "time_in", "time_out"}
