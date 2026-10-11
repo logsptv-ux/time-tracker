@@ -170,11 +170,18 @@
       "id": "fe7c73c6-f21c-4f4b-88ad-d3fe0116656a"
     },
     {
+      "date": "2026-10-11",
+      "task": "evl l3 p2 section sheet 2 finalize bms UPSTAND",
+      "time_in": "2026-10-11T16:21",
+      "time_out": "2026-10-11T17:04",
+      "id": "402f95ac-ff10-47f0-8d8e-375aa3c108ff"
+    },
+    {
       "date": "2026-10-10",
-      "task": "evl l3 p2 section sheet 2 finalize bms t2",
+      "task": "evl l3 p2 section sheet 2 finalize bms T2",
       "time_in": "2026-10-10T21:48",
       "time_out": "2026-10-10T23:06",
-      "id": "402f95ac-ff10-47f0-8d8e-375aa3c108ff"
+      "id": "d408b819-5089-4de7-9a94-3fcd280f7687"
     }
   ],
   "pending": null
