@@ -14,7 +14,7 @@ from typing import Optional
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
-    QFrame, QHeaderView, QMessageBox, QCompleter, QScrollArea, QDateEdit
+    QFrame, QHeaderView, QMessageBox, QCompleter, QScrollArea, QDateEdit, QMenu
 )
 from PySide6.QtCore import Qt, QTimer, QTime, QPoint, QDate
 from PySide6.QtGui import QFont
@@ -708,7 +708,7 @@ class TimeLogApp(QMainWindow):
         frame.setObjectName("card")
         layout = QVBoxLayout(frame)
 
-        title = QLabel("Activity Log")
+        title = QLabel("Activity Log (Right-click row to delete)")
         title.setObjectName("label-secondary")
         layout.addWidget(title)
 
@@ -727,11 +727,70 @@ class TimeLogApp(QMainWindow):
         self.table.setMinimumHeight(200)
         self.table.setAlternatingRowColors(True)
 
+        # Enable context menu for deleting entries
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_table_context_menu)
+
         layout.addWidget(self.table)
         self.table_section = frame
         parent_layout.addWidget(frame)
 
         self.refresh_table()
+
+    def show_table_context_menu(self, pos):
+        """Show context menu for activity log table to delete entries"""
+        item = self.table.itemAt(pos)
+        if not item:
+            return
+
+        row = item.row()
+        date_item = self.table.item(row, 0)
+        task_item = self.table.item(row, 1)
+        time_in_item = self.table.item(row, 2)
+        time_out_item = self.table.item(row, 3)
+
+        if not all([date_item, task_item, time_in_item, time_out_item]):
+            return
+
+        date_val = date_item.text()
+        task_val = task_item.text()
+        time_in_val = time_in_item.text()
+        time_out_val = time_out_item.text()
+
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {Theme.BG_SECONDARY};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER};
+            }}
+            QMenu::item {{
+                padding: 6px 20px;
+            }}
+            QMenu::item:selected {{
+                background-color: {Theme.HOVER_BG};
+            }}
+        """)
+
+        delete_action = menu.addAction("Delete Entry")
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+
+        if action == delete_action:
+            reply = QMessageBox.question(
+                self, "Confirm Deletion",
+                f"Are you sure you want to delete this entry?\n\nTask: {task_val}\nDate: {date_val} ({time_in_val} - {time_out_val})",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                all_entries = sorted(self.data.entries, key=lambda e: (e.date, e.time_in), reverse=True)
+                if 0 <= row < len(all_entries):
+                    target_entry = all_entries[row]
+                    self.data.entries = [e for e in self.data.entries if e.id != target_entry.id]
+                    self.data.save()
+                    self.refresh_table()
+                    self.update_statistics()
+                    self.update_task_completer()
+                    print(f"[OK] Deleted entry: {task_val} on {date_val}")
 
     def create_statistics_section(self, parent_layout):
         """Create the statistics section"""
