@@ -14,9 +14,9 @@ from typing import Optional
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
-    QFrame, QHeaderView, QMessageBox, QCompleter, QScrollArea
+    QFrame, QHeaderView, QMessageBox, QCompleter, QScrollArea, QDateEdit
 )
-from PySide6.QtCore import Qt, QTimer, QTime, QPoint
+from PySide6.QtCore import Qt, QTimer, QTime, QPoint, QDate
 from PySide6.QtGui import QFont
 
 
@@ -639,12 +639,31 @@ class TimeLogApp(QMainWindow):
         title.setObjectName("label-secondary")
         layout.addWidget(title)
 
-        task_label = QLabel("Task Name")
-        layout.addWidget(task_label)
+        top_row_layout = QHBoxLayout()
+        top_row_layout.setSpacing(12)
 
+        date_layout = QVBoxLayout()
+        date_label = QLabel("Date")
+        date_layout.addWidget(date_label)
+        self.date_input = QDateEdit()
+        self.date_input.setDate(QDate.currentDate())
+        self.date_input.setCalendarPopup(True)
+        self.date_input.setMinimumHeight(32)
+        self.date_input.setMinimumWidth(130)
+        self.date_input.setDisplayFormat("yyyy-MM-dd")
+        date_layout.addWidget(self.date_input)
+        top_row_layout.addLayout(date_layout, 1)
+
+        task_layout = QVBoxLayout()
+        task_label = QLabel("Task Name")
+        task_layout.addWidget(task_label)
         self.task_input = QLineEdit()
         self.task_input.setPlaceholderText("e.g., Design Review, Meeting")
-        layout.addWidget(self.task_input)
+        self.task_input.setMinimumHeight(32)
+        task_layout.addWidget(self.task_input)
+        top_row_layout.addLayout(task_layout, 3)
+
+        layout.addLayout(top_row_layout)
 
         time_layout = QHBoxLayout()
         time_layout.setSpacing(12)
@@ -891,16 +910,21 @@ class TimeLogApp(QMainWindow):
                 or (self.task_input and self.task_input.text().strip())
                 or "Untitled Task"
             )
+            date_str = (
+                self.date_input.date().toString("yyyy-MM-dd")
+                if hasattr(self, 'date_input') and self.date_input
+                else self.current_date
+            )
             time_in = self.timer_start_time.strftime("%H:%M")
             time_out = datetime.now().strftime("%H:%M")
 
-            entry = TimeEntry(self.current_date, task, time_in, time_out)
+            entry = TimeEntry(date_str, task, time_in, time_out)
 
             if self.data.add_entry(entry):
                 self.refresh_table()
                 self.update_statistics()
                 self.update_task_completer()
-                QMessageBox.information(self, "Success", f"Entry saved: {task} ({time_in} - {time_out}, {entry.duration_display()})")
+                QMessageBox.information(self, "Success", f"Entry saved: {task} ({date_str}, {time_in} - {time_out}, {entry.duration_display()})")
                 self.reset_timer()
             else:
                 QMessageBox.critical(self, "Error", "Failed to save entry")
@@ -947,6 +971,11 @@ class TimeLogApp(QMainWindow):
     def on_save_entry(self):
         """Save a manual entry from full mode"""
         task = self.task_input.text().strip()
+        date_str = (
+            self.date_input.date().toString("yyyy-MM-dd")
+            if hasattr(self, 'date_input') and self.date_input
+            else self.current_date
+        )
         time_in = self.time_in_input.text().strip()
         time_out = self.time_out_input.text().strip()
 
@@ -962,7 +991,7 @@ class TimeLogApp(QMainWindow):
             return
 
         try:
-            entry = TimeEntry(self.current_date, task, time_in, time_out)
+            entry = TimeEntry(date_str, task, time_in, time_out)
             if self.data.add_entry(entry):
                 self.refresh_table()
                 self.update_statistics()
@@ -971,9 +1000,11 @@ class TimeLogApp(QMainWindow):
                 self.task_input.clear()
                 self.time_in_input.clear()
                 self.time_out_input.clear()
+                if hasattr(self, 'date_input') and self.date_input:
+                    self.date_input.setDate(QDate.currentDate())
 
-                QMessageBox.information(self, "Success", "Entry saved successfully!")
-                print(f"[OK] Entry saved: {task}")
+                QMessageBox.information(self, "Success", f"Entry saved successfully for {date_str}!")
+                print(f"[OK] Entry saved: {task} on {date_str}")
             else:
                 QMessageBox.critical(self, "Error", "Failed to save entry to disk")
         except Exception as e:
