@@ -165,11 +165,26 @@ class TimeEntry:
         self.time_in = time_in
         self.time_out = time_out
 
+    def get_clean_time(self, time_str: str) -> str:
+        """Extract HH:MM from time string (handles ISO format e.g. 2026-09-28T09:30)"""
+        if not time_str:
+            return "00:00"
+        if 'T' in time_str:
+            time_str = time_str.split('T')[-1]
+        elif ' ' in time_str:
+            time_str = time_str.split(' ')[-1]
+        parts = time_str.split(':')
+        if len(parts) >= 2:
+            return f"{parts[0].zfill(2)}:{parts[1].zfill(2)}"
+        return time_str
+
     def duration_minutes(self) -> float:
         """Calculate duration in minutes"""
         try:
-            start = datetime.strptime(self.time_in, "%H:%M")
-            end = datetime.strptime(self.time_out, "%H:%M")
+            t_in = self.get_clean_time(self.time_in)
+            t_out = self.get_clean_time(self.time_out)
+            start = datetime.strptime(t_in, "%H:%M")
+            end = datetime.strptime(t_out, "%H:%M")
             if end < start:
                 end += timedelta(days=1)
             return (end - start).total_seconds() / 60
@@ -569,7 +584,7 @@ class TimeLogApp(QMainWindow):
         frame.setObjectName("card")
         layout = QVBoxLayout(frame)
 
-        title = QLabel("Today's Log")
+        title = QLabel("Activity Log")
         title.setObjectName("label-secondary")
         layout.addWidget(title)
 
@@ -680,7 +695,8 @@ class TimeLogApp(QMainWindow):
 
             print("[INFO] Switched to compact widget mode")
         else:
-            self.showFullScreen()
+            self.setMaximumSize(16777215, 16777215)
+            self.showMaximized()
 
             if self.full_entry_form_section:
                 self.full_entry_form_section.setVisible(True)
@@ -752,7 +768,11 @@ class TimeLogApp(QMainWindow):
             if hasattr(self, 'timer_update_timer'):
                 self.timer_update_timer.stop()
 
-            task = self.quick_task_input.text().strip() or "Untitled Task"
+            task = (
+                self.quick_task_input.text().strip()
+                or (self.task_input and self.task_input.text().strip())
+                or "Untitled Task"
+            )
             time_in = self.timer_start_time.strftime("%H:%M")
             time_out = datetime.now().strftime("%H:%M")
 
@@ -761,7 +781,7 @@ class TimeLogApp(QMainWindow):
             if self.data.add_entry(entry):
                 self.refresh_table()
                 self.update_statistics()
-                QMessageBox.information(self, "Success", f"Entry saved: {task}")
+                QMessageBox.information(self, "Success", f"Entry saved: {task} ({time_in} - {time_out}, {entry.duration_display()})")
                 self.reset_timer()
             else:
                 QMessageBox.critical(self, "Error", "Failed to save entry")
@@ -846,20 +866,18 @@ class TimeLogApp(QMainWindow):
         try:
             self.table.setRowCount(0)
 
-            today = datetime.now().strftime("%Y-%m-%d")
-            today_entries = [e for e in self.data.entries if e.date == today]
-            today_entries.sort(key=lambda e: e.time_in, reverse=True)
+            all_entries = sorted(self.data.entries, key=lambda e: (e.date, e.time_in), reverse=True)
 
-            for i, entry in enumerate(today_entries):
+            for i, entry in enumerate(all_entries):
                 self.table.insertRow(i)
 
                 self.table.setItem(i, 0, QTableWidgetItem(entry.date))
                 self.table.setItem(i, 1, QTableWidgetItem(entry.task))
-                self.table.setItem(i, 2, QTableWidgetItem(entry.time_in))
-                self.table.setItem(i, 3, QTableWidgetItem(entry.time_out))
+                self.table.setItem(i, 2, QTableWidgetItem(entry.get_clean_time(entry.time_in)))
+                self.table.setItem(i, 3, QTableWidgetItem(entry.get_clean_time(entry.time_out)))
                 self.table.setItem(i, 4, QTableWidgetItem(entry.duration_display()))
 
-            print(f"[OK] Table refreshed with {len(today_entries)} entries")
+            print(f"[OK] Table refreshed with {len(all_entries)} entries")
         except Exception as e:
             print(f"[ERROR] Failed to refresh table: {e}")
             traceback.print_exc()
