@@ -14,7 +14,7 @@ from typing import Optional
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
-    QFrame, QHeaderView, QMessageBox
+    QFrame, QHeaderView, QMessageBox, QCompleter, QScrollArea
 )
 from PySide6.QtCore import Qt, QTimer, QTime, QPoint
 from PySide6.QtGui import QFont
@@ -59,6 +59,13 @@ class StyleSheet:
                 border-bottom: 2px solid """ + Theme.BORDER + """;
             }
 
+            QFrame#card {
+                background-color: """ + Theme.BG_SECONDARY + """;
+                border: 1px solid """ + Theme.BORDER + """;
+                border-radius: 8px;
+                padding: 12px;
+            }
+
             QLabel {
                 background-color: transparent;
                 color: """ + Theme.TEXT_PRIMARY + """;
@@ -72,37 +79,91 @@ class StyleSheet:
             }
 
             QPushButton {
-                background-color: """ + Theme.BG_SECONDARY + """;
+                background-color: #2b2b2b;
                 color: """ + Theme.TEXT_PRIMARY + """;
-                border: 1px solid """ + Theme.BORDER + """;
-                border-radius: 4px;
-                padding: 8px;
-                font-weight: 500;
+                border: 1px solid #3f3f3f;
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-weight: 600;
                 font-size: 12px;
-                min-width: 60px;
-                min-height: 36px;
+                min-width: 50px;
+                min-height: 32px;
             }
 
             QPushButton:hover {
-                background-color: """ + Theme.HOVER_BG + """;
-                border: 1px solid """ + Theme.TEXT_SECONDARY + """;
+                background-color: #383838;
+                border: 1px solid #666666;
             }
 
             QPushButton:pressed {
-                background-color: """ + Theme.BG_PRIMARY + """;
+                background-color: #202020;
+                border: 1px solid #555555;
+            }
+
+            QPushButton:disabled {
+                background-color: #1f1f1f;
+                color: #555555;
+                border: 1px solid #2a2a2a;
+            }
+
+            QPushButton#primary {
+                background-color: #2563eb;
+                color: #ffffff;
+                border: 1px solid #3b82f6;
+            }
+
+            QPushButton#primary:hover {
+                background-color: #1d4ed8;
+                border: 1px solid #60a5fa;
+            }
+
+            QPushButton#primary:pressed {
+                background-color: #1e40af;
+            }
+
+            QPushButton#control-btn {
+                border-radius: 16px;
+                min-width: 36px;
+                max-width: 36px;
+                min-height: 32px;
+                max-height: 32px;
+                padding: 0px;
+                font-weight: bold;
+            }
+
+            QPushButton#control-btn-primary {
+                background-color: #2563eb;
+                color: #ffffff;
+                border: 1px solid #3b82f6;
+                border-radius: 16px;
+                min-width: 36px;
+                max-width: 36px;
+                min-height: 32px;
+                max-height: 32px;
+                padding: 0px;
+                font-weight: bold;
+            }
+
+            QPushButton#control-btn-primary:hover {
+                background-color: #1d4ed8;
+                border: 1px solid #60a5fa;
+            }
+
+            QPushButton#control-btn-primary:pressed {
+                background-color: #1e40af;
             }
 
             QLineEdit {
                 background-color: """ + Theme.BG_SECONDARY + """;
                 color: """ + Theme.TEXT_PRIMARY + """;
                 border: 1px solid """ + Theme.BORDER + """;
-                border-radius: 4px;
-                padding: 6px;
+                border-radius: 6px;
+                padding: 8px;
                 font-size: 11px;
             }
 
             QLineEdit:focus {
-                border: 2px solid """ + Theme.TEXT_SECONDARY + """;
+                border: 1px solid #3b82f6;
             }
 
             QTableWidget {
@@ -193,13 +254,14 @@ class TimeEntry:
             return 0
 
     def duration_display(self) -> str:
-        """Return formatted duration"""
+        """Return formatted duration in decimal hours (e.g. 1.5 Hrs)"""
         minutes = self.duration_minutes()
-        hours = int(minutes // 60)
-        mins = int(minutes % 60)
-        if hours > 0:
-            return f"{hours}h {mins}m"
-        return f"{mins}m"
+        hours = minutes / 60.0
+        if hours == int(hours):
+            return f"{int(hours)} Hrs"
+        else:
+            formatted = f"{hours:.2f}".rstrip('0').rstrip('.')
+            return f"{formatted} Hrs"
 
     def to_dict(self) -> dict:
         return {
@@ -329,7 +391,7 @@ class TimeLogApp(QMainWindow):
 
     # Window size constants - ULTRA COMPACT
     WIDGET_WIDTH = 380
-    WIDGET_HEIGHT = 200
+    WIDGET_HEIGHT = 175
     FULL_WIDTH = 1100
     FULL_HEIGHT = 880
 
@@ -402,35 +464,72 @@ class TimeLogApp(QMainWindow):
         self.create_header()
         layout.addWidget(self.header_frame)
 
-        # Main content - no scroll area, just direct layout
+        # Main content with scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setStyleSheet("background: transparent;")
+
         content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(8, 8, 8, 8)
-        content_layout.setSpacing(6)
+        self.content_layout = QVBoxLayout(content)
+        self.content_layout.setContentsMargins(8, 4, 8, 8)
+        self.content_layout.setSpacing(4)
 
-        # Timer Display
-        self.create_timer_section(content_layout)
+        # Timer & Controls Container (raised higher at top)
+        timer_controls_widget = QWidget()
+        tc_layout = QVBoxLayout(timer_controls_widget)
+        tc_layout.setContentsMargins(0, 0, 0, 0)
+        tc_layout.setSpacing(4)
 
-        # Quick Controls
-        self.create_controls_section(content_layout)
+        self.create_timer_section(tc_layout)
+        self.create_controls_section(tc_layout)
+
+        self.content_layout.addWidget(timer_controls_widget)
 
         # Quick Entry (for compact mode)
-        self.create_quick_entry_section(content_layout)
+        self.create_quick_entry_section(self.content_layout)
 
         # Full Entry Form (hidden in compact mode)
-        self.create_entry_form(content_layout)
+        self.create_entry_form(self.content_layout)
 
         # Time Entries Table (hidden in compact mode)
-        self.create_entries_table(content_layout)
+        self.create_entries_table(self.content_layout)
 
         # Statistics (hidden in compact mode)
-        self.create_statistics_section(content_layout)
+        self.create_statistics_section(self.content_layout)
 
-        layout.addWidget(content)
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area)
 
         # Footer (hidden in compact mode)
         self.create_footer()
         layout.addWidget(self.footer_frame)
+
+        # Initialize task completer suggestions from previous logs
+        self.update_task_completer()
+
+    def update_task_completer(self):
+        """Update task name completer suggestions from previous entries"""
+        try:
+            task_names = sorted(list(set(e.task for e in self.data.entries if e.task and e.task.strip())))
+            for widget in [getattr(self, 'quick_task_input', None), getattr(self, 'task_input', None)]:
+                if widget:
+                    completer = QCompleter(task_names, widget)
+                    completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+                    completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+                    popup = completer.popup()
+                    popup.setStyleSheet(f"""
+                        QAbstractItemView {{
+                            background-color: {Theme.BG_SECONDARY};
+                            color: {Theme.TEXT_PRIMARY};
+                            selection-background-color: {Theme.HOVER_BG};
+                            selection-color: {Theme.TEXT_PRIMARY};
+                            border: 1px solid {Theme.BORDER};
+                        }}
+                    """)
+                    widget.setCompleter(completer)
+        except Exception as e:
+            print(f"[WARN] Failed to update task completer: {e}")
 
     def create_header(self):
         """Create the header section with window controls on right"""
@@ -481,19 +580,22 @@ class TimeLogApp(QMainWindow):
     def create_controls_section(self, parent_layout):
         """Create the control buttons - COMPACT SYMBOLS ONLY"""
         frame = QWidget()
+        frame.setFixedHeight(42)
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(8)
 
         layout.addStretch()
 
         self.btn_start = QPushButton("▶")
+        self.btn_start.setObjectName("control-btn-primary")
         self.btn_start.setFixedSize(36, 32)
         self.btn_start.setFont(QFont("Arial", 10))
         self.btn_start.clicked.connect(self.on_timer_start)
         layout.addWidget(self.btn_start)
 
         self.btn_pause = QPushButton("⏸")
+        self.btn_pause.setObjectName("control-btn")
         self.btn_pause.setFixedSize(36, 32)
         self.btn_pause.setFont(QFont("Arial", 10))
         self.btn_pause.clicked.connect(self.on_timer_pause)
@@ -501,6 +603,7 @@ class TimeLogApp(QMainWindow):
         layout.addWidget(self.btn_pause)
 
         self.btn_stop = QPushButton("⏹")
+        self.btn_stop.setObjectName("control-btn")
         self.btn_stop.setFixedSize(36, 32)
         self.btn_stop.setFont(QFont("Arial", 10))
         self.btn_stop.clicked.connect(self.on_timer_stop)
@@ -508,6 +611,7 @@ class TimeLogApp(QMainWindow):
         layout.addWidget(self.btn_stop)
 
         self.btn_reset = QPushButton("✕")
+        self.btn_reset.setObjectName("control-btn")
         self.btn_reset.setFixedSize(36, 32)
         self.btn_reset.setFont(QFont("Arial", 10))
         self.btn_reset.clicked.connect(self.on_timer_reset)
@@ -571,6 +675,7 @@ class TimeLogApp(QMainWindow):
         layout.addSpacing(12)
 
         btn_save = QPushButton("Save Entry")
+        btn_save.setObjectName("primary")
         btn_save.setMinimumHeight(36)
         btn_save.clicked.connect(self.on_save_entry)
         layout.addWidget(btn_save)
@@ -679,6 +784,10 @@ class TimeLogApp(QMainWindow):
             self.setMinimumSize(self.WIDGET_WIDTH, self.WIDGET_HEIGHT)
             self.setMaximumSize(self.WIDGET_WIDTH, self.WIDGET_HEIGHT)
 
+            if hasattr(self, 'content_layout') and self.content_layout:
+                self.content_layout.setContentsMargins(12, 6, 12, 8)
+                self.content_layout.setSpacing(6)
+
             if self.full_entry_form_section:
                 self.full_entry_form_section.setVisible(False)
             if self.table_section:
@@ -697,6 +806,10 @@ class TimeLogApp(QMainWindow):
         else:
             self.setMaximumSize(16777215, 16777215)
             self.showMaximized()
+
+            if hasattr(self, 'content_layout') and self.content_layout:
+                self.content_layout.setContentsMargins(32, 24, 32, 64)
+                self.content_layout.setSpacing(16)
 
             if self.full_entry_form_section:
                 self.full_entry_form_section.setVisible(True)
@@ -740,6 +853,11 @@ class TimeLogApp(QMainWindow):
         if not self.timer_running:
             self.timer_running = True
             self.timer_start_time = datetime.now()
+
+            start_str = self.timer_start_time.strftime("%H:%M")
+            if hasattr(self, 'time_in_input') and self.time_in_input:
+                self.time_in_input.setText(start_str)
+
             self.btn_start.setEnabled(False)
             self.btn_pause.setEnabled(True)
             self.btn_stop.setEnabled(True)
@@ -781,6 +899,7 @@ class TimeLogApp(QMainWindow):
             if self.data.add_entry(entry):
                 self.refresh_table()
                 self.update_statistics()
+                self.update_task_completer()
                 QMessageBox.information(self, "Success", f"Entry saved: {task} ({time_in} - {time_out}, {entry.duration_display()})")
                 self.reset_timer()
             else:
@@ -847,6 +966,7 @@ class TimeLogApp(QMainWindow):
             if self.data.add_entry(entry):
                 self.refresh_table()
                 self.update_statistics()
+                self.update_task_completer()
 
                 self.task_input.clear()
                 self.time_in_input.clear()
